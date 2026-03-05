@@ -1,12 +1,26 @@
 #!/usr/bin/env bash
 # Pillar 1: User
-# Activities: 1.3.1, 1.4.1, 1.5.1, 1.7.1
+# Activities: 1.3.1, 1.4.1, 1.5.1, 1.7.1, 1.8.1 (Single Auth), 1.8 (Continuous Auth)
 
 # Global vars for cross-check data sharing
 USERS_WITH_CONSOLE_COUNT=0
 USERS_WITH_CONSOLE_LIST=()
 SSO_CONFIGURED=false
 ADMIN_USER_COUNT=0
+GUARDDUTY_DETECTOR_ID=""
+
+# Track 1.3.1 results for 1.8.1 Single Auth validation
+CHECK_1_3_1_A_PASSED=false  # Root MFA
+CHECK_1_3_1_B_PASSED=false  # User MFA
+CHECK_1_3_1_C_PASSED=false  # SSO Configured
+CHECK_1_3_1_D_PASSED=false  # No local users when SSO
+CHECK_1_3_1_E_PASSED=false  # MFA SCP
+CHECK_1_3_1_F_PASSED=false  # External IdP
+EXTERNAL_IDP_CONFIGURED=false
+
+# Track 1.8 (Continuous Auth) results for 1.8.1 reference
+CHECK_1_8_A_PASSED=false    # Session duration
+CHECK_1_8_C_PASSED=false    # CloudTrail logging
 
 check_pillar_1_user() {
     pillar_header 1 "USER"
@@ -18,6 +32,8 @@ check_pillar_1_user() {
     check_1_4_1_pam
     check_1_5_1_ilm
     check_1_7_1_deny_default
+    check_1_8_continuous_auth
+    check_1_8_1_single_auth
     
     pillar_score "User" "$pass_count" "$total_checks"
 }
@@ -41,6 +57,7 @@ check_1_3_1_mfa_idp() {
     if [[ "$root_mfa" == "1" ]]; then
         log_pass "1.3.1-A: Root account has MFA enabled"
         ((activity_pass++))
+        CHECK_1_3_1_A_PASSED=true
     else
         log_finding "BLOCKER" "1.3.1-A" \
             "Root account does NOT have MFA enabled" \
@@ -80,6 +97,7 @@ check_1_3_1_mfa_idp() {
                 log_pass "1.3.1-B: No IAM users with console access found"
             fi
             ((activity_pass++))
+            CHECK_1_3_1_B_PASSED=true
         fi
         
         USERS_WITH_CONSOLE_COUNT=${#users_with_console[@]}
@@ -101,6 +119,7 @@ check_1_3_1_mfa_idp() {
         log_pass "1.3.1-C: IAM Identity Center (SSO) is configured"
         ((activity_pass++))
         SSO_CONFIGURED=true
+        CHECK_1_3_1_C_PASSED=true
         local identity_store_id
         identity_store_id=$(aws_cmd sso-admin list-instances --query 'Instances[0].IdentityStoreId' --output text 2>/dev/null || echo "")
         log_info "  Identity Store ID: $identity_store_id"
@@ -121,6 +140,7 @@ check_1_3_1_mfa_idp() {
         else
             log_pass "1.3.1-D: SSO configured and no local IAM users with console access"
             ((activity_pass++))
+            CHECK_1_3_1_D_PASSED=true
         fi
     else
         log_info "1.3.1-D: SSO not configured - local IAM user retirement check N/A"
@@ -157,6 +177,7 @@ check_1_3_1_mfa_idp() {
             if [[ "$mfa_scp_found" == "true" ]]; then
                 log_pass "1.3.1-E: MFA enforcement SCP exists at organization level"
                 ((activity_pass++))
+                CHECK_1_3_1_E_PASSED=true
             else
                 log_finding "MEDIUM" "1.3.1-E" \
                     "No SCP with MFA enforcement found" \
@@ -206,6 +227,8 @@ check_1_3_1_mfa_idp() {
         if [[ "$external_idp_found" == "true" ]]; then
             log_pass "1.3.1-F: External IdP federation configured (SAML/OIDC)"
             ((activity_pass++))
+            CHECK_1_3_1_F_PASSED=true
+            EXTERNAL_IDP_CONFIGURED=true
         else
             log_finding "MEDIUM" "1.3.1-F" \
                 "No external IdP federation (SAML/OIDC) detected" \
@@ -222,6 +245,8 @@ check_1_3_1_mfa_idp() {
             external_idp_found=true
             log_pass "1.3.1-F: External IdP federation configured (SAML/OIDC)"
             ((activity_pass++))
+            CHECK_1_3_1_F_PASSED=true
+            EXTERNAL_IDP_CONFIGURED=true
         else
             log_finding "MEDIUM" "1.3.1-F" \
                 "No external IdP federation (SAML/OIDC) detected" \
@@ -766,4 +791,326 @@ check_1_7_1_deny_default() {
     ((pass_count += activity_pass)) || true
     ((total_checks += activity_total)) || true
     log_info "Activity 1.7.1 Score: $activity_pass/$activity_total"
+}
+
+# =============================================================================
+# Activity 1.8.1 - Continuous Authentication
+# See docs/checks/1.8.1-continuous-auth.md for detailed documentation
+# NOTE: Full continuous auth requires external tooling. These checks verify
+#       AWS config supports continuous authentication principles.
+# =============================================================================
+
+check_1_8_continuous_auth() {
+    log_info "Checking Activity 1.8 - Continuous Authentication..."
+    log_info "  Note: Full continuous auth requires external IdP/UEBA. Checking AWS alignment."
+    
+    local activity_pass=0
+    local activity_total=0
+    
+    # Check 1.8-A: IAM Role Maximum Session Duration
+    ((activity_total++))
+    local long_session_roles=()
+    local max_recommended=14400  # 4 hours in seconds
+    local iam_roles
+    iam_roles=$(aws_cmd iam list-roles --query 'Roles[?starts_with(RoleName, `AWS`) == `false`].RoleName' --output text 2>/dev/null || echo "")
+    
+    for role in $iam_roles; do
+        local max_duration
+        max_duration=$(aws_cmd iam get-role --role-name "$role" --query 'Role.MaxSessionDuration' --output text 2>/dev/null || echo "3600")
+        if [[ "$max_duration" -gt "$max_recommended" ]]; then
+            long_session_roles+=("$role:${max_duration}s")
+        fi
+    done
+    
+    if [[ ${#long_session_roles[@]} -gt 0 ]]; then
+        log_finding "MEDIUM" "1.8-A" \
+            "Roles with session duration > 4 hours: ${long_session_roles[*]}" \
+            "Reduce MaxSessionDuration to enforce periodic re-authentication"
+    else
+        log_pass "1.8-A: All IAM roles have session duration ≤ 4 hours"
+        ((activity_pass++))
+        CHECK_1_8_A_PASSED=true
+    fi
+    
+    # Check 1.8-B: GuardDuty Enabled for Anomaly Detection
+    ((activity_total++))
+    local detector_id
+    detector_id=$(aws_cmd guardduty list-detectors --query 'DetectorIds[0]' --output text 2>/dev/null || echo "")
+    
+    if [[ -n "$detector_id" && "$detector_id" != "None" && "$detector_id" != "null" ]]; then
+        local detector_status
+        detector_status=$(aws_cmd guardduty get-detector --detector-id "$detector_id" --query 'Status' --output text 2>/dev/null || echo "")
+        
+        if [[ "$detector_status" == "ENABLED" ]]; then
+            log_pass "1.8-B: GuardDuty enabled for anomaly detection"
+            ((activity_pass++))
+            GUARDDUTY_DETECTOR_ID="$detector_id"
+        else
+            log_finding "HIGH" "1.8-B" \
+                "GuardDuty detector exists but is DISABLED" \
+                "Enable GuardDuty: aws guardduty update-detector --detector-id $detector_id --enable"
+            GUARDDUTY_DETECTOR_ID=""
+        fi
+    else
+        log_finding "HIGH" "1.8-B" \
+            "GuardDuty is not enabled - no anomaly detection for credential misuse" \
+            "Enable GuardDuty: aws guardduty create-detector --enable"
+        GUARDDUTY_DETECTOR_ID=""
+    fi
+
+    # Check 1.8-C: CloudTrail Multi-Region for Session Monitoring
+    ((activity_total++))
+    local multi_region_trail_active=false
+    local trails
+    trails=$(aws_cmd cloudtrail describe-trails --query 'trailList[?IsMultiRegionTrail==`true`].Name' --output text 2>/dev/null || echo "")
+    
+    for trail in $trails; do
+        local is_logging
+        is_logging=$(aws_cmd cloudtrail get-trail-status --name "$trail" --query 'IsLogging' --output text 2>/dev/null || echo "false")
+        if [[ "$is_logging" == "True" || "$is_logging" == "true" ]]; then
+            multi_region_trail_active=true
+            log_info "  Active multi-region trail: $trail"
+            break
+        fi
+    done
+    
+    if [[ "$multi_region_trail_active" == "true" ]]; then
+        log_pass "1.8-C: Multi-region CloudTrail enabled for session monitoring"
+        ((activity_pass++))
+        CHECK_1_8_C_PASSED=true
+    else
+        log_finding "MEDIUM" "1.8-C" \
+            "No active multi-region CloudTrail trail found" \
+            "Enable multi-region trail for complete session activity logging"
+    fi
+    
+    # Check 1.8-D: IAM Policies with MFA Age Conditions
+    ((activity_total++))
+    local mfa_age_policy_found=false
+    local customer_policies
+    customer_policies=$(aws_cmd iam list-policies --scope Local --query 'Policies[].Arn' --output text 2>/dev/null || echo "")
+    
+    for policy_arn in $customer_policies; do
+        local version_id
+        version_id=$(aws_cmd iam get-policy --policy-arn "$policy_arn" --query 'Policy.DefaultVersionId' --output text 2>/dev/null || echo "")
+        if [[ -n "$version_id" ]]; then
+            local policy_doc
+            policy_doc=$(aws_cmd iam get-policy-version --policy-arn "$policy_arn" --version-id "$version_id" --query 'PolicyVersion.Document' --output json 2>/dev/null || echo "")
+            
+            if echo "$policy_doc" | grep -qE 'aws:MultiFactorAuthAge'; then
+                mfa_age_policy_found=true
+                local policy_name
+                policy_name=$(basename "$policy_arn")
+                log_info "  Found MFA age condition in policy: $policy_name"
+                break
+            fi
+        fi
+    done
+    
+    # Also check SCPs if in org management account
+    if [[ "$mfa_age_policy_found" == "false" ]]; then
+        local org_id
+        org_id=$(aws_cmd organizations describe-organization --query 'Organization.Id' --output text 2>/dev/null || echo "")
+        
+        if [[ -n "$org_id" && "$org_id" != "None" && "$org_id" != "null" ]]; then
+            local scp_list
+            scp_list=$(aws_cmd organizations list-policies --filter SERVICE_CONTROL_POLICY --query 'Policies[].Id' --output text 2>/dev/null || echo "")
+            
+            for policy_id in $scp_list; do
+                local policy_content
+                policy_content=$(aws_cmd organizations describe-policy --policy-id "$policy_id" --query 'Policy.Content' --output text 2>/dev/null || echo "")
+                if echo "$policy_content" | grep -qE 'aws:MultiFactorAuthAge'; then
+                    mfa_age_policy_found=true
+                    local policy_name
+                    policy_name=$(aws_cmd organizations describe-policy --policy-id "$policy_id" --query 'Policy.PolicySummary.Name' --output text 2>/dev/null || echo "$policy_id")
+                    log_info "  Found MFA age condition in SCP: $policy_name"
+                    break
+                fi
+            done
+        fi
+    fi
+    
+    if [[ "$mfa_age_policy_found" == "true" ]]; then
+        log_pass "1.8-D: MFA age-based re-authentication policy found"
+        ((activity_pass++))
+    else
+        log_finding "MEDIUM" "1.8-D" \
+            "No policies enforce MFA age limits (aws:MultiFactorAuthAge)" \
+            "Add MFA age condition to enforce periodic re-authentication"
+    fi
+
+    # Check 1.8-E: Security Hub Enabled
+    ((activity_total++))
+    local securityhub_status
+    securityhub_status=$(aws_cmd securityhub describe-hub --query 'HubArn' --output text 2>/dev/null || echo "")
+    
+    if [[ -n "$securityhub_status" && "$securityhub_status" != "None" && "$securityhub_status" != "null" ]]; then
+        log_pass "1.8-E: Security Hub enabled for centralized security findings"
+        ((activity_pass++))
+    else
+        log_finding "LOW" "1.8-E" \
+            "Security Hub is not enabled" \
+            "Enable Security Hub for aggregated security monitoring"
+    fi
+    
+    # Check 1.8-F: IAM Identity Center Session Duration
+    ((activity_total++))
+    # SSO_CONFIGURED is set by check_1_3_1_mfa_idp
+    if [[ "$SSO_CONFIGURED" == "true" ]]; then
+        log_pass "1.8-F: IAM Identity Center configured for centralized session management"
+        ((activity_pass++))
+        log_info "  Note: Verify session duration settings in IAM Identity Center console"
+    else
+        log_finding "MEDIUM" "1.8-F" \
+            "IAM Identity Center not configured - no centralized session management" \
+            "Enable IAM Identity Center for centralized authentication and session control"
+    fi
+    
+    # Check 1.8-G: GuardDuty Credential Findings
+    ((activity_total++))
+    if [[ -n "$GUARDDUTY_DETECTOR_ID" ]]; then
+        # Check for credential-related findings
+        local credential_findings
+        credential_findings=$(aws_cmd guardduty list-findings --detector-id "$GUARDDUTY_DETECTOR_ID" \
+            --finding-criteria '{"Criterion": {"severity": {"Gte": 7}}}' \
+            --query 'FindingIds | length(@)' --output text 2>/dev/null || echo "0")
+        
+        if [[ "$credential_findings" -gt 0 ]]; then
+            # Get more details on finding types
+            local finding_ids
+            finding_ids=$(aws_cmd guardduty list-findings --detector-id "$GUARDDUTY_DETECTOR_ID" \
+                --finding-criteria '{"Criterion": {"severity": {"Gte": 7}}}' \
+                --max-results 5 --query 'FindingIds' --output json 2>/dev/null || echo "[]")
+            
+            local unauthorized_count=0
+            if [[ "$finding_ids" != "[]" ]]; then
+                local findings_detail
+                findings_detail=$(aws_cmd guardduty get-findings --detector-id "$GUARDDUTY_DETECTOR_ID" \
+                    --finding-ids "$finding_ids" --query 'Findings[].Type' --output text 2>/dev/null || echo "")
+                
+                # Count UnauthorizedAccess or CredentialAccess findings
+                unauthorized_count=$(echo "$findings_detail" | grep -cE 'UnauthorizedAccess|CredentialAccess' || echo "0")
+            fi
+            
+            if [[ "$unauthorized_count" -gt 0 ]]; then
+                log_finding "HIGH" "1.8-G" \
+                    "$unauthorized_count HIGH/CRITICAL credential-related GuardDuty findings" \
+                    "Review findings: aws guardduty list-findings --detector-id $GUARDDUTY_DETECTOR_ID"
+            else
+                log_pass "1.8-G: No HIGH/CRITICAL credential-related GuardDuty findings"
+                ((activity_pass++))
+            fi
+        else
+            log_pass "1.8-G: No HIGH/CRITICAL GuardDuty findings"
+            ((activity_pass++))
+        fi
+    else
+        log_info "1.8-G: GuardDuty not enabled - cannot check for credential findings"
+        ((activity_pass++))  # Don't double-penalize
+    fi
+    
+    ((pass_count += activity_pass)) || true
+    ((total_checks += activity_total)) || true
+    log_info "Activity 1.8 Score: $activity_pass/$activity_total"
+}
+
+
+# =============================================================================
+# Activity 1.8.1 - Single Authentication
+# See docs/checks/1.8.1-single-auth.md for detailed documentation
+# NOTE: This activity validates that prerequisites from 1.3.1 and 1.8 are met
+#       for session-based authentication. It references prior check results.
+# =============================================================================
+
+check_1_8_1_single_auth() {
+    log_info "Checking Activity 1.8.1 - Single Authentication..."
+    log_info "  Validating session authentication prerequisites from 1.3.1 and 1.8"
+    
+    local activity_pass=0
+    local activity_total=0
+    
+    # Check 1.8.1-A: IdP Configured for Session Authentication
+    # References: 1.3.1-C (SSO) or 1.3.1-F (External IdP)
+    ((activity_total++))
+    if [[ "$CHECK_1_3_1_C_PASSED" == "true" || "$CHECK_1_3_1_F_PASSED" == "true" ]]; then
+        log_pass "1.8.1-A: IdP configured for session authentication (via 1.3.1-C/F)"
+        ((activity_pass++))
+        if [[ "$CHECK_1_3_1_C_PASSED" == "true" ]]; then
+            log_info "  → IAM Identity Center (SSO) provides session auth"
+        fi
+        if [[ "$CHECK_1_3_1_F_PASSED" == "true" ]]; then
+            log_info "  → External IdP (SAML/OIDC) provides session auth"
+        fi
+    else
+        log_finding "HIGH" "1.8.1-A" \
+            "No IdP configured for session authentication" \
+            "Configure IAM Identity Center (1.3.1-C) or external IdP federation (1.3.1-F)"
+    fi
+    
+    # Check 1.8.1-B: MFA Enforced at Session Initiation
+    # References: 1.3.1-A (Root MFA), 1.3.1-B (User MFA)
+    ((activity_total++))
+    local mfa_checks_passed=0
+    local mfa_checks_total=2
+    
+    [[ "$CHECK_1_3_1_A_PASSED" == "true" ]] && ((mfa_checks_passed++))
+    [[ "$CHECK_1_3_1_B_PASSED" == "true" ]] && ((mfa_checks_passed++))
+    
+    if [[ "$mfa_checks_passed" -eq "$mfa_checks_total" ]]; then
+        log_pass "1.8.1-B: MFA enforced at session initiation (via 1.3.1-A/B)"
+        ((activity_pass++))
+        log_info "  → Root account MFA: PASS"
+        log_info "  → User MFA: PASS"
+    else
+        log_finding "HIGH" "1.8.1-B" \
+            "MFA not fully enforced at session initiation ($mfa_checks_passed/$mfa_checks_total checks passed)" \
+            "Ensure root MFA (1.3.1-A) and user MFA (1.3.1-B) are configured"
+        [[ "$CHECK_1_3_1_A_PASSED" == "true" ]] && log_info "  → Root account MFA: PASS" || log_info "  → Root account MFA: FAIL"
+        [[ "$CHECK_1_3_1_B_PASSED" == "true" ]] && log_info "  → User MFA: PASS" || log_info "  → User MFA: FAIL"
+    fi
+    
+    # Check 1.8.1-C: Session Timeout Configuration
+    # References: 1.8-A (Session Duration)
+    ((activity_total++))
+    if [[ "$CHECK_1_8_A_PASSED" == "true" ]]; then
+        log_pass "1.8.1-C: Session timeout configured appropriately (via 1.8-A)"
+        ((activity_pass++))
+        log_info "  → IAM role session durations ≤ 4 hours"
+    else
+        log_finding "MEDIUM" "1.8.1-C" \
+            "Session timeout not optimally configured (see 1.8-A)" \
+            "Reduce IAM role MaxSessionDuration to enforce session limits"
+    fi
+    
+    # Check 1.8.1-D: No Local Service Accounts When SSO Configured
+    # References: 1.3.1-D (Local users when SSO exists)
+    ((activity_total++))
+    if [[ "$SSO_CONFIGURED" == "false" ]]; then
+        log_info "1.8.1-D: SSO not configured - local account check N/A"
+        ((activity_pass++))
+    elif [[ "$CHECK_1_3_1_D_PASSED" == "true" ]]; then
+        log_pass "1.8.1-D: No local service accounts bypassing IdP (via 1.3.1-D)"
+        ((activity_pass++))
+    else
+        log_finding "MEDIUM" "1.8.1-D" \
+            "Local IAM users exist alongside SSO (see 1.3.1-D)" \
+            "Migrate local users to IAM Identity Center or document exceptions"
+    fi
+    
+    # Check 1.8.1-E: Authentication Logging Enabled
+    # References: 1.8-C (CloudTrail)
+    ((activity_total++))
+    if [[ "$CHECK_1_8_C_PASSED" == "true" ]]; then
+        log_pass "1.8.1-E: Authentication logging enabled (via 1.8-C)"
+        ((activity_pass++))
+        log_info "  → Multi-region CloudTrail captures auth events"
+    else
+        log_finding "MEDIUM" "1.8.1-E" \
+            "Authentication logging not fully configured (see 1.8-C)" \
+            "Enable multi-region CloudTrail for authentication event logging"
+    fi
+    
+    ((pass_count += activity_pass)) || true
+    ((total_checks += activity_total)) || true
+    log_info "Activity 1.8.1 Score: $activity_pass/$activity_total"
 }

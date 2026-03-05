@@ -1,6 +1,6 @@
 # AWS ZIG Phase One Checker (Bash)
 
-NSA Zero Trust Implementation Guideline Phase One compliance checker for AWS GovCloud.
+NSA Zero Trust Implementation Guideline compliance checker for AWS accounts.
 
 ## Quick Start
 
@@ -23,6 +23,18 @@ NSA Zero Trust Implementation Guideline Phase One compliance checker for AWS Gov
 - AWS CLI v2
 - jq
 - bash 4.0+
+
+## Testing
+
+```bash
+# Run all tests
+./test/test_runner.sh
+
+# Run a specific test file
+./test/test_runner.sh test/test_utils.sh
+```
+
+The test framework is pure bash with zero external dependencies.
 
 ---
 
@@ -110,6 +122,14 @@ aws-zig-check/
 │       ├── 5_network.sh     # Pillar 5: Network
 │       ├── 6_automation.sh  # Pillar 6: Automation
 │       └── 7_visibility.sh  # Pillar 7: Visibility
+├── test/
+│   ├── test_runner.sh       # Test framework (pure bash)
+│   ├── test_config.sh       # Config tests
+│   ├── test_utils.sh        # Utility function tests
+│   ├── test_user_pillar.sh  # User pillar unit tests
+│   └── test_integration.sh  # Integration tests
+├── docs/
+│   └── checks/              # Detailed check documentation
 └── README.md
 ```
 
@@ -117,7 +137,7 @@ aws-zig-check/
 
 | Pillar | Activities | Status |
 |--------|------------|--------|
-| 1. User | 1.3.1, 1.4.1, 1.5.1, 1.7.1 | 🚧 |
+| 1. User | 1.3.1, 1.4.1, 1.5.1, 1.7.1, 1.8.1, 1.8 | 🚧 |
 | 2. Device | 2.1.2, 2.4.1, 2.5.1, 2.6.1, 2.6.2, 2.7.1 | 🚧 |
 | 3. Application | 3.2.1, 3.2.2, 3.3.1, 3.3.2, 3.4.1, 3.4.3 | 🚧 |
 | 4. Data | 4.2.1, 4.3.1, 4.4.3, 4.5.1, 4.6.1 | 🚧 |

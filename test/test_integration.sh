@@ -115,12 +115,17 @@ test_check_docs_exist() {
 }
 
 test_1_8_1_doc_exists() {
-    assert_file_exists "$PROJECT_ROOT/docs/checks/1.8.1-continuous-auth.md"
+    assert_file_exists "$PROJECT_ROOT/docs/checks/1.8.1-single-auth.md"
+}
+
+test_1_8_continuous_auth_doc_exists() {
+    assert_file_exists "$PROJECT_ROOT/docs/checks/1.8-continuous-auth.md"
 }
 
 run_test test_readme_exists "README.md exists"
 run_test test_check_docs_exist "Check documentation files exist"
-run_test test_1_8_1_doc_exists "1.8.1 continuous auth documentation exists"
+run_test test_1_8_1_doc_exists "1.8.1 single auth documentation exists"
+run_test test_1_8_continuous_auth_doc_exists "1.8 continuous auth documentation exists"
 
 # =============================================================================
 # Main script help validation
@@ -167,9 +172,19 @@ test_1_8_1_function_defined() {
     source "$PROJECT_ROOT/lib/utils.sh"
     source "$PROJECT_ROOT/lib/pillars/1_user.sh"
     
-    declare -f check_1_8_1_continuous_auth >/dev/null
+    declare -f check_1_8_1_single_auth >/dev/null
+    assert_exit_code 0 $?
+}
+
+test_1_8_continuous_auth_function_defined() {
+    source "$PROJECT_ROOT/lib/config.sh"
+    source "$PROJECT_ROOT/lib/utils.sh"
+    source "$PROJECT_ROOT/lib/pillars/1_user.sh"
+    
+    declare -f check_1_8_continuous_auth >/dev/null
     assert_exit_code 0 $?
 }
 
 run_test test_check_functions_defined "Pillar check functions are defined"
-run_test test_1_8_1_function_defined "check_1_8_1_continuous_auth function is defined"
+run_test test_1_8_1_function_defined "check_1_8_1_single_auth function is defined"
+run_test test_1_8_continuous_auth_function_defined "check_1_8_continuous_auth function is defined"
