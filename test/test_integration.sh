@@ -208,8 +208,29 @@ test_device_pillar_docs_exist() {
     assert_file_exists "$PROJECT_ROOT/docs/checks/2.7.1-edr-integration.md"
 }
 
+test_application_pillar_functions_defined() {
+    source "$PROJECT_ROOT/lib/config.sh"
+    source "$PROJECT_ROOT/lib/utils.sh"
+    source "$PROJECT_ROOT/lib/pillars/3_application.sh"
+    
+    # Check that all application pillar functions are defined
+    declare -f check_pillar_3_application >/dev/null && \
+    declare -f check_3_2_devsecops >/dev/null && \
+    declare -f check_3_3_software_risk >/dev/null && \
+    declare -f check_3_4_resource_authorization >/dev/null
+    assert_exit_code 0 $?
+}
+
+test_application_pillar_docs_exist() {
+    assert_file_exists "$PROJECT_ROOT/docs/checks/3.2-devsecops.md" && \
+    assert_file_exists "$PROJECT_ROOT/docs/checks/3.3-software-risk.md" && \
+    assert_file_exists "$PROJECT_ROOT/docs/checks/3.4-resource-authorization.md"
+}
+
 run_test test_check_functions_defined "Pillar check functions are defined"
 run_test test_1_8_1_function_defined "check_1_8_1_single_auth function is defined"
 run_test test_1_8_continuous_auth_function_defined "check_1_8_continuous_auth function is defined"
 run_test test_device_pillar_functions_defined "Device pillar check functions are defined"
 run_test test_device_pillar_docs_exist "Device pillar documentation exists"
+run_test test_application_pillar_functions_defined "Application pillar check functions are defined"
+run_test test_application_pillar_docs_exist "Application pillar documentation exists"

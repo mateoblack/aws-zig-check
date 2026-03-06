@@ -1,0 +1,9 @@
+# ZIG Reference Documents (government documents - do not distribute)
+docs/zig-phase-one/
+
+# Kiro specs and steering (local configuration)
+.kiro/specs/
+.kiro/steering/
+
+# OS files
+.DS_Store
