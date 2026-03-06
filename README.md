@@ -1,5 +1,19 @@
 # AWS ZIG Phase One Checker (Bash)
 
+> ⚠️ **IMPORTANT DISCLAIMER - NOT PRODUCTION READY**
+>
+> This tool is provided **for educational and evaluation purposes only**. It has **NOT** undergone formal AWS security review and should **NOT** be considered production-ready software.
+>
+> **Use at your own risk.** This code:
+> - Has not been reviewed or approved by AWS Security
+> - May contain bugs, security vulnerabilities, or incomplete implementations
+> - Should not be used as the sole basis for compliance decisions
+> - Is not officially supported or maintained by AWS
+>
+> If you choose to use this tool, you are responsible for validating its output and ensuring it meets your organization's security requirements. Always consult with qualified security professionals before making compliance decisions.
+
+---
+
 NSA Zero Trust Implementation Guideline compliance checker for AWS accounts.
 
 ## Quick Start
@@ -137,13 +151,15 @@ aws-zig-check/
 
 | Pillar | Activities | Status |
 |--------|------------|--------|
-| 1. User | 1.3.1, 1.4.1, 1.5.1, 1.7.1, 1.8.1, 1.8 | 🚧 |
-| 2. Device | 2.1.2, 2.4.1, 2.5.1, 2.6.1, 2.6.2, 2.7.1 | 🚧 |
-| 3. Application | 3.2.1, 3.2.2, 3.3.1, 3.3.2, 3.4.1, 3.4.3 | 🚧 |
-| 4. Data | 4.2.1, 4.3.1, 4.4.3, 4.5.1, 4.6.1 | 🚧 |
-| 5. Network | 5.1.2, 5.2.2, 5.3.1, 5.4.1 | 🚧 |
-| 6. Automation | 6.1.2, 6.5.2, 6.6.2, 6.7.1 | 🚧 |
-| 7. Visibility | 7.1.2, 7.2.1, 7.2.4, 7.3.1, 7.5.1 | 🚧 |
+| 1. User | 1.3.1, 1.4.1, 1.5.1, 1.7.1, 1.8.1, 1.8 | ✅ |
+| 2. Device | 2.1.2, 2.4.1, 2.5.1, 2.6.1, 2.6.2, 2.7.1 | ✅ |
+| 3. Application | 3.2.1, 3.2.2, 3.3.1, 3.3.2, 3.4.1, 3.4.3 | ✅ |
+| 4. Data | 4.2.1, 4.3.1, 4.4.3, 4.5.1, 4.6.1 | ✅ |
+| 5. Network | 5.1.2, 5.2.2, 5.3.1, 5.4.1 | ✅ |
+| 6. Automation | 6.1.2, 6.5.2, 6.6.2, 6.7.1 | ✅ |
+| 7. Visibility | 7.1.2, 7.2.1, 7.2.4, 7.3.1, 7.5.1 | ✅ |
+
+All 7 pillars have been implemented with automated checks. See `docs/checks/` for detailed documentation on each activity.
 
 ## Severity Levels
 
@@ -152,3 +168,37 @@ aws-zig-check/
 - `MEDIUM` - Should improve, plan remediation
 - `LOW` - Enhancement opportunity
 - `PASS` - Requirement met
+
+---
+
+## Security & Compliance Notice
+
+### Limitations
+
+This tool provides automated checks against a subset of NSA ZIG Phase One requirements. It does **not** provide:
+
+- Complete coverage of all ZIG requirements (many require manual review or external tools)
+- Validation of organizational policies, procedures, or governance
+- Assessment of third-party integrations or external identity providers
+- Network traffic analysis or behavioral monitoring
+- Penetration testing or vulnerability assessment
+
+### AWS Service Limitations
+
+Some ZIG requirements cannot be fully validated through AWS APIs alone:
+
+- Identity Provider (IdP) MFA enforcement requires IdP-side verification
+- Device compliance requires integration with MDM/UEM solutions
+- Full DLP capabilities may require third-party tools (e.g., CASB)
+- Behavioral analytics may require additional SIEM/SOAR integration
+
+### Recommendations
+
+1. Use this tool as a **starting point** for ZIG compliance assessment, not as a definitive audit
+2. Supplement automated checks with manual review and professional security assessment
+3. Consult the [NSA Zero Trust Guidance](https://www.nsa.gov/Press-Room/Cybersecurity-Advisories-Guidance/) for authoritative requirements
+4. Engage qualified security professionals for production compliance validation
+
+### No Warranty
+
+THIS SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED. THE AUTHORS AND CONTRIBUTORS ARE NOT LIABLE FOR ANY DAMAGES OR SECURITY INCIDENTS ARISING FROM THE USE OF THIS TOOL.
