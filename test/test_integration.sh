@@ -232,5 +232,40 @@ run_test test_1_8_1_function_defined "check_1_8_1_single_auth function is define
 run_test test_1_8_continuous_auth_function_defined "check_1_8_continuous_auth function is defined"
 run_test test_device_pillar_functions_defined "Device pillar check functions are defined"
 run_test test_device_pillar_docs_exist "Device pillar documentation exists"
+test_data_pillar_functions_defined() {
+    source "$PROJECT_ROOT/lib/config.sh"
+    source "$PROJECT_ROOT/lib/utils.sh"
+    source "$PROJECT_ROOT/lib/pillars/4_data.sh"
+    
+    # Check that all data pillar functions are defined
+    declare -f check_pillar_4_data >/dev/null && \
+    declare -f check_4_2_data_tagging >/dev/null && \
+    declare -f check_4_4_file_monitoring >/dev/null && \
+    declare -f check_4_5_data_protection >/dev/null && \
+    declare -f check_4_6_dlp_enforcement >/dev/null
+    assert_exit_code 0 $?
+}
+
+test_data_pillar_docs_exist() {
+    assert_file_exists "$PROJECT_ROOT/docs/checks/4.2-data-tagging.md" && \
+    assert_file_exists "$PROJECT_ROOT/docs/checks/4.4-file-monitoring.md" && \
+    assert_file_exists "$PROJECT_ROOT/docs/checks/4.5-data-protection.md" && \
+    assert_file_exists "$PROJECT_ROOT/docs/checks/4.6-dlp-enforcement.md"
+}
+
+test_data_pillar_compliance_tags_defined() {
+    source "$PROJECT_ROOT/lib/config.sh"
+    source "$PROJECT_ROOT/lib/utils.sh"
+    source "$PROJECT_ROOT/lib/pillars/4_data.sh"
+    
+    # Check that compliance tag arrays are defined
+    [[ ${#COMPLIANCE_TAG_KEYS[@]} -gt 0 ]] && \
+    [[ ${#COMPLIANCE_TAG_VALUES[@]} -gt 0 ]]
+    assert_exit_code 0 $?
+}
+
 run_test test_application_pillar_functions_defined "Application pillar check functions are defined"
 run_test test_application_pillar_docs_exist "Application pillar documentation exists"
+run_test test_data_pillar_functions_defined "Data pillar check functions are defined"
+run_test test_data_pillar_docs_exist "Data pillar documentation exists"
+run_test test_data_pillar_compliance_tags_defined "Data pillar compliance tags are defined"
