@@ -269,3 +269,42 @@ run_test test_application_pillar_docs_exist "Application pillar documentation ex
 run_test test_data_pillar_functions_defined "Data pillar check functions are defined"
 run_test test_data_pillar_docs_exist "Data pillar documentation exists"
 run_test test_data_pillar_compliance_tags_defined "Data pillar compliance tags are defined"
+
+# =============================================================================
+# Network Pillar validation
+# =============================================================================
+
+test_network_pillar_functions_defined() {
+    source "$PROJECT_ROOT/lib/config.sh"
+    source "$PROJECT_ROOT/lib/utils.sh"
+    source "$PROJECT_ROOT/lib/pillars/5_network.sh"
+    
+    # Check that all network pillar functions are defined
+    declare -f check_pillar_5_network >/dev/null && \
+    declare -f check_5_1_granular_access >/dev/null && \
+    declare -f check_5_2_sdn_infrastructure >/dev/null && \
+    declare -f check_5_3_macro_segmentation >/dev/null && \
+    declare -f check_5_4_micro_segmentation >/dev/null
+    assert_exit_code 0 $?
+}
+
+test_network_pillar_docs_exist() {
+    assert_file_exists "$PROJECT_ROOT/docs/checks/5.1-granular-access.md" && \
+    assert_file_exists "$PROJECT_ROOT/docs/checks/5.2-sdn-infrastructure.md" && \
+    assert_file_exists "$PROJECT_ROOT/docs/checks/5.3-macro-segmentation.md" && \
+    assert_file_exists "$PROJECT_ROOT/docs/checks/5.4-micro-segmentation.md"
+}
+
+test_network_pillar_ram_helper_defined() {
+    source "$PROJECT_ROOT/lib/config.sh"
+    source "$PROJECT_ROOT/lib/utils.sh"
+    source "$PROJECT_ROOT/lib/pillars/5_network.sh"
+    
+    # Check that RAM-shared resource helper is defined
+    declare -f get_resource_owner_note >/dev/null
+    assert_exit_code 0 $?
+}
+
+run_test test_network_pillar_functions_defined "Network pillar check functions are defined"
+run_test test_network_pillar_docs_exist "Network pillar documentation exists"
+run_test test_network_pillar_ram_helper_defined "Network pillar RAM helper is defined"
