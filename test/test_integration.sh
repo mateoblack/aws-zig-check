@@ -308,3 +308,31 @@ test_network_pillar_ram_helper_defined() {
 run_test test_network_pillar_functions_defined "Network pillar check functions are defined"
 run_test test_network_pillar_docs_exist "Network pillar documentation exists"
 run_test test_network_pillar_ram_helper_defined "Network pillar RAM helper is defined"
+
+# =============================================================================
+# Automation Pillar validation
+# =============================================================================
+
+test_automation_pillar_functions_defined() {
+    source "$PROJECT_ROOT/lib/config.sh"
+    source "$PROJECT_ROOT/lib/utils.sh"
+    source "$PROJECT_ROOT/lib/pillars/6_automation.sh"
+    
+    # Check that all automation pillar functions are defined
+    declare -f check_pillar_6_automation >/dev/null && \
+    declare -f check_6_1_2_access_profiles >/dev/null && \
+    declare -f check_6_5_2_soar_tools >/dev/null && \
+    declare -f check_6_6_2_api_standardization >/dev/null && \
+    declare -f check_6_7_1_workflow_enrichment >/dev/null
+    assert_exit_code 0 $?
+}
+
+test_automation_pillar_docs_exist() {
+    assert_file_exists "$PROJECT_ROOT/docs/checks/6.1.2-access-profiles.md" && \
+    assert_file_exists "$PROJECT_ROOT/docs/checks/6.5.2-soar-tools.md" && \
+    assert_file_exists "$PROJECT_ROOT/docs/checks/6.6.2-api-standardization.md" && \
+    assert_file_exists "$PROJECT_ROOT/docs/checks/6.7.1-workflow-enrichment.md"
+}
+
+run_test test_automation_pillar_functions_defined "Automation pillar check functions are defined"
+run_test test_automation_pillar_docs_exist "Automation pillar documentation exists"
