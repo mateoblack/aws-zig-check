@@ -185,6 +185,31 @@ test_1_8_continuous_auth_function_defined() {
     assert_exit_code 0 $?
 }
 
+test_device_pillar_functions_defined() {
+    source "$PROJECT_ROOT/lib/config.sh"
+    source "$PROJECT_ROOT/lib/utils.sh"
+    source "$PROJECT_ROOT/lib/pillars/2_device.sh"
+    
+    # Check that all device pillar functions are defined
+    declare -f check_pillar_2_device >/dev/null && \
+    declare -f check_2_1_2_device_inventory >/dev/null && \
+    declare -f check_2_4_1_deny_device_default >/dev/null && \
+    declare -f check_2_5_1_vulnerability_patch >/dev/null && \
+    declare -f check_2_6_endpoint_management >/dev/null && \
+    declare -f check_2_7_1_edr_integration >/dev/null
+    assert_exit_code 0 $?
+}
+
+test_device_pillar_docs_exist() {
+    assert_file_exists "$PROJECT_ROOT/docs/checks/2.1.2-device-inventory.md" && \
+    assert_file_exists "$PROJECT_ROOT/docs/checks/2.4.1-deny-device-default.md" && \
+    assert_file_exists "$PROJECT_ROOT/docs/checks/2.5.1-vulnerability-patch.md" && \
+    assert_file_exists "$PROJECT_ROOT/docs/checks/2.6-endpoint-management.md" && \
+    assert_file_exists "$PROJECT_ROOT/docs/checks/2.7.1-edr-integration.md"
+}
+
 run_test test_check_functions_defined "Pillar check functions are defined"
 run_test test_1_8_1_function_defined "check_1_8_1_single_auth function is defined"
 run_test test_1_8_continuous_auth_function_defined "check_1_8_continuous_auth function is defined"
+run_test test_device_pillar_functions_defined "Device pillar check functions are defined"
+run_test test_device_pillar_docs_exist "Device pillar documentation exists"
