@@ -336,3 +336,33 @@ test_automation_pillar_docs_exist() {
 
 run_test test_automation_pillar_functions_defined "Automation pillar check functions are defined"
 run_test test_automation_pillar_docs_exist "Automation pillar documentation exists"
+
+# =============================================================================
+# Visibility Pillar validation
+# =============================================================================
+
+test_visibility_pillar_functions_defined() {
+    source "$PROJECT_ROOT/lib/config.sh"
+    source "$PROJECT_ROOT/lib/utils.sh"
+    source "$PROJECT_ROOT/lib/pillars/7_visibility.sh"
+    
+    # Check that all visibility pillar functions are defined
+    declare -f check_pillar_7_visibility >/dev/null && \
+    declare -f check_7_1_2_log_parsing >/dev/null && \
+    declare -f check_7_2_1_threat_alerting >/dev/null && \
+    declare -f check_7_2_4_asset_correlation >/dev/null && \
+    declare -f check_7_3_1_analytics_tools >/dev/null && \
+    declare -f check_7_5_1_cti_program >/dev/null
+    assert_exit_code 0 $?
+}
+
+test_visibility_pillar_docs_exist() {
+    assert_file_exists "$PROJECT_ROOT/docs/checks/7.1.2-log-parsing.md" && \
+    assert_file_exists "$PROJECT_ROOT/docs/checks/7.2.1-threat-alerting.md" && \
+    assert_file_exists "$PROJECT_ROOT/docs/checks/7.2.4-asset-correlation.md" && \
+    assert_file_exists "$PROJECT_ROOT/docs/checks/7.3.1-analytics-tools.md" && \
+    assert_file_exists "$PROJECT_ROOT/docs/checks/7.5.1-cti-program.md"
+}
+
+run_test test_visibility_pillar_functions_defined "Visibility pillar check functions are defined"
+run_test test_visibility_pillar_docs_exist "Visibility pillar documentation exists"
